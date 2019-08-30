@@ -120,9 +120,11 @@ func getClientWithMaxRev(ctx context.Context, endpoints []string, tc *tls.Config
 	for _, endpoint := range endpoints {
 		// TODO: update clientv3 to 3.2.x and then use ctx as in clientv3.Config.
 		cfg := clientv3.Config{
-			Endpoints:   []string{endpoint},
-			DialTimeout: constants.DefaultDialTimeout,
-			TLS:         tc,
+			Endpoints:            []string{endpoint},
+			DialTimeout:          constants.DefaultDialTimeout,
+			DialKeepAliveTime:    constants.DefaultDialKeepAliveTime,
+			DialKeepAliveTimeout: constants.DefaultDialKeepAliveTimeout,
+			TLS:                  tc,
 		}
 		etcdcli, err := clientv3.New(cfg)
 		if err != nil {

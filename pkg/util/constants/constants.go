@@ -17,7 +17,9 @@ package constants
 import "time"
 
 const (
-	DefaultDialTimeout    = 5 * time.Second
+	DefaultDialTimeout    = 30 * time.Second
+	DefaultDialKeepAliveTime = 10 * time.Second
+	DefaultDialKeepAliveTimeout = 120 * time.Second
 	DefaultRequestTimeout = 5 * time.Second
 	// DefaultBackupTimeout is the default maximal allowed time of the entire backup process.
 	DefaultBackupTimeout    = 1 * time.Minute
