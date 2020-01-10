@@ -270,9 +270,9 @@ func addOwnerRefToObject(o metav1.Object, r metav1.OwnerReference) {
 
 // NewSeedMemberPod returns a Pod manifest for a seed member.
 // It's special that it has new token, and might need recovery init containers
-func NewSeedMemberPod(clusterName string, ms etcdutil.MemberSet, m *etcdutil.Member, cs api.ClusterSpec, owner metav1.OwnerReference, backupURL *url.URL) *v1.Pod {
+func NewSeedMemberPod(kubecli kubernetes.Interface, clusterName, clusterNamespace string, ms etcdutil.MemberSet, m *etcdutil.Member, cs api.ClusterSpec, owner metav1.OwnerReference, backupURL *url.URL) *v1.Pod {
 	token := uuid.New()
-	pod := newEtcdPod(m, ms.PeerURLPairs(), clusterName, "new", token, cs)
+	pod := newEtcdPod(kubecli, m, ms.PeerURLPairs(), clusterName, clusterNamespace, "new", token, cs)
 	// TODO: PVC datadir support for restore process
 	AddEtcdVolumeToPod(pod, nil)
 	if backupURL != nil {
@@ -297,16 +297,26 @@ func NewEtcdPodPVC(m *etcdutil.Member, pvcSpec v1.PersistentVolumeClaimSpec, clu
 	return pvc
 }
 
-func newEtcdPod(m *etcdutil.Member, initialCluster []string, clusterName, state, token string, cs api.ClusterSpec) *v1.Pod {
+func newEtcdPod(kubecli kubernetes.Interface, m *etcdutil.Member, initialCluster []string, clusterName, clusterNamespace, state, token string, cs api.ClusterSpec) *v1.Pod {
 	commands := fmt.Sprintf("/usr/local/bin/etcd --data-dir=%s --name=%s --initial-advertise-peer-urls=%s "+
 		"--listen-peer-urls=%s --listen-client-urls=%s --advertise-client-urls=%s "+
 		"--initial-cluster=%s --initial-cluster-state=%s",
 		dataDir, m.Name, m.PeerURL(), m.ListenPeerURL(), m.ListenClientURL(), m.ClientURL(), strings.Join(initialCluster, ","), state)
 	if m.SecurePeer {
-		commands += fmt.Sprintf(" --peer-client-cert-auth=true --peer-trusted-ca-file=%[1]s/peer-ca.crt --peer-cert-file=%[1]s/peer.crt --peer-key-file=%[1]s/peer.key", peerTLSDir)
+		secret, err := kubecli.CoreV1().Secrets(clusterNamespace).Get(cs.TLS.Static.Member.PeerSecret, metav1.GetOptions{})
+		if err == nil && secret.Type == v1.SecretTypeTLS {
+			commands += fmt.Sprintf(" --peer-client-cert-auth=true --peer-trusted-ca-file=%[1]s/ca.crt --peer-cert-file=%[1]s/tls.crt --peer-key-file=%[1]s/tls.key", peerTLSDir)
+		} else {
+			commands += fmt.Sprintf(" --peer-client-cert-auth=true --peer-trusted-ca-file=%[1]s/peer-ca.crt --peer-cert-file=%[1]s/peer.crt --peer-key-file=%[1]s/peer.key", peerTLSDir)
+		}
 	}
 	if m.SecureClient {
-		commands += fmt.Sprintf(" --client-cert-auth=true --trusted-ca-file=%[1]s/server-ca.crt --cert-file=%[1]s/server.crt --key-file=%[1]s/server.key", serverTLSDir)
+		secret, err := kubecli.CoreV1().Secrets(clusterNamespace).Get(cs.TLS.Static.Member.ServerSecret, metav1.GetOptions{})
+		if err == nil && secret.Type == v1.SecretTypeTLS {
+			commands += fmt.Sprintf(" --peer-client-cert-auth=true --peer-trusted-ca-file=%[1]s/ca.crt --peer-cert-file=%[1]s/tls.crt --peer-key-file=%[1]s/tls.key", serverTLSDir)
+		} else {
+			commands += fmt.Sprintf(" --client-cert-auth=true --trusted-ca-file=%[1]s/server-ca.crt --cert-file=%[1]s/server.crt --key-file=%[1]s/server.key", serverTLSDir)
+		}
 	}
 	if state == "new" {
 		commands = fmt.Sprintf("%s --initial-cluster-token=%s", commands, token)
@@ -413,8 +423,8 @@ func podSecurityContext(podPolicy *api.PodPolicy) *v1.PodSecurityContext {
 	return podPolicy.SecurityContext
 }
 
-func NewEtcdPod(m *etcdutil.Member, initialCluster []string, clusterName, state, token string, cs api.ClusterSpec, owner metav1.OwnerReference) *v1.Pod {
-	pod := newEtcdPod(m, initialCluster, clusterName, state, token, cs)
+func NewEtcdPod(kubecli kubernetes.Interface, m *etcdutil.Member, initialCluster []string, clusterName, clusterNamespace, state, token string, cs api.ClusterSpec, owner metav1.OwnerReference) *v1.Pod {
+	pod := newEtcdPod(kubecli, m, initialCluster, clusterName, clusterNamespace, state, token, cs)
 	applyPodPolicy(clusterName, pod, cs.Pod)
 	addOwnerRefToObject(pod.GetObjectMeta(), owner)
 	return pod
