@@ -334,8 +334,18 @@ func newEtcdPod(kubecli kubernetes.Interface, m *etcdutil.Member, initialCluster
 		"etcd_cluster": clusterName,
 	}
 
-	livenessProbe := newEtcdProbe(cs.TLS.IsSecureClient())
-	readinessProbe := newEtcdProbe(cs.TLS.IsSecureClient())
+	isTLSSecret := false
+	if cs.TLS.IsSecureClient() {
+		secret, err := kubecli.CoreV1().Secrets(clusterNamespace).Get(cs.TLS.Static.OperatorSecret, metav1.GetOptions{})
+		if err != nil {
+			return nil, err
+		}
+		if secret.Type == v1.SecretTypeTLS {
+			isTLSSecret = true
+		}
+	}
+	livenessProbe := newEtcdProbe(cs.TLS.IsSecureClient(), isTLSSecret)
+	readinessProbe := newEtcdProbe(cs.TLS.IsSecureClient(), isTLSSecret)
 	readinessProbe.InitialDelaySeconds = 1
 	readinessProbe.TimeoutSeconds = 5
 	readinessProbe.PeriodSeconds = 5
