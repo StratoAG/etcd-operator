@@ -15,10 +15,10 @@
 package k8sutil
 
 import (
-	"github.com/coreos/etcd-operator/pkg/util/etcdutil"
 	v1 "k8s.io/api/core/v1"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/coreos/etcd-operator/pkg/util/etcdutil"
 	"k8s.io/client-go/kubernetes"
 )
 
