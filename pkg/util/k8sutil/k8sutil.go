@@ -340,7 +340,7 @@ func newEtcdPod(kubecli kubernetes.Interface, m *etcdutil.Member, initialCluster
 		if err != nil {
 			return nil, err
 		}
-			isTLSSecret = secret.Type == v1.SecretTypeTLS
+		isTLSSecret = secret.Type == v1.SecretTypeTLS
 	}
 	livenessProbe := newEtcdProbe(cs.TLS.IsSecureClient(), isTLSSecret)
 	readinessProbe := newEtcdProbe(cs.TLS.IsSecureClient(), isTLSSecret)
